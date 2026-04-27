@@ -23,7 +23,7 @@ WebGPU/FastSearch
   runs supported generated searches through `public/compiled-search-runtime.js`
   returns either the same choice vector or the older candidate ID, depending on the generator
   runs scalar direct TinySupGen candidates through a real browser WebGPU kernel when available
-  runs recursive generated searches through the compiled CPU evaluator for now
+  runs recursive generated searches and selector-pair searches through the compiled CPU evaluator for now
 ```
 
 The BabySupGen panel has a dialect selector:
@@ -71,6 +71,42 @@ assert score([2,1]) == 3
 ```
 
 It also supports direct small `Int` expressions, `Int[] -> Int[]` filters/sorts, and `Int[][] -> Int[]` flattening.
+
+## Helper Hints
+
+There are two helper forms:
+
+```text
+def aux = ?
+```
+
+Untyped helper holes ask the generator to choose a small helper type and body.
+
+```text
+def pickPrime(xs: Int[]) -> Int: ?
+def isPrimeLike(x: Int) -> Bool: ?
+def target(xs: Int[]) -> Int[]: ?
+```
+
+Typed helper holes constrain the helper signature while leaving the body unknown. The target is the typed def used by the `assert` lines; every other typed def is treated as a helper hint.
+
+Hints help search because they name and type intermediate structure. They are not examples by themselves, and they are not implementations. The oracle still comes from `assert` and `ensure` lines.
+
+For example, this asks for two generated selectors over the same list:
+
+```text
+def pickPrime(xs: Int[]) -> Int: ?
+def pickEven(xs: Int[]) -> Int: ?
+def isPrimeLike(x: Int) -> Bool: ?
+def isEvenLike(x: Int) -> Bool: ?
+def LargestPrimeBySmallestEvenNumber(xs: Int[]) -> Int[]: ?
+
+assert LargestPrimeBySmallestEvenNumber([17,25,4,8]) == [17,4]
+assert LargestPrimeBySmallestEvenNumber([23,35,8,14]) == [23,8]
+assert LargestPrimeBySmallestEvenNumber([29,49,10,12]) == [29,10]
+```
+
+Those counterexamples matter. Without composite odd values such as `25`, `35`, and `49`, the search can legally find a cheaper predicate like "largest odd" or "largest non-multiple-of-3" that satisfies the smaller sample set.
 
 The older TinySupGen fallback supports these target shapes:
 

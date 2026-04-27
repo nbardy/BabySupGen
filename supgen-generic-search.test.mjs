@@ -46,6 +46,27 @@ assert.deepEqual(
 );
 assert.ok(!filterSearch.choices[0].items.some((item) => /filter|sort/.test(item.source)));
 
+const selectorPairSpec = parseTinySpec(genericSupGenPresets.largestPrimeSmallestEven.spec);
+assert.deepEqual(
+  selectorPairSpec.helpers.map((helper) => [helper.name, helper.typed, helper.ret]),
+  [
+    ["pickPrime", true, "Int"],
+    ["pickEven", true, "Int"],
+    ["isPrimeLike", true, "Bool"],
+    ["isEvenLike", true, "Bool"],
+  ],
+);
+const selectorPairSearch = buildGenericSupGenSearch(selectorPairSpec, { depth: 4 });
+assert.deepEqual(
+  selectorPairSearch.choices[0].items.map((item) => item.source),
+  [
+    "selector pair list output",
+    "generic structural recursion with predicate helper",
+    "generic structural recursion with list helper",
+  ],
+);
+assert.match(selectorPairSearch.decodeChoiceVector([0, 44, 7, 26, 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 1, 0, 0]), /def pickPrime\(xs: Int\[\]\) -> Int:/);
+
 const minimalSortSearch = buildGenericSupGenSearch(parseTinySpec(genericSupGenPresets.sort.spec), {
   depth: 4,
   dialect: "minimal",

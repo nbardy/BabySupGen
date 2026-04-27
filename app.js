@@ -557,13 +557,21 @@ function setTinyPreset(name) {
   tinyOutput.textContent = "Run Search to synthesize from the spec.";
 }
 
+function formatHelper(helper) {
+  if (helper.typed) {
+    const args = (helper.args || []).map((arg) => `${arg.name}: ${arg.type}`).join(", ");
+    return `${helper.name}(${args}) -> ${helper.ret}`;
+  }
+  return helper.name;
+}
+
 function summarizeTinySearch(search) {
   const target = search.spec.target;
   if (search.mode === "choiceVector") {
     const fastIR = buildFastSearchIR(search);
     const dialectText = search.primitiveSet?.label || search.dialect || "unknown";
     const helperText = search.spec.helpers.length
-      ? `Helpers: ${search.spec.helpers.map((helper) => helper.name).join(", ")}\n`
+      ? `Helpers: ${search.spec.helpers.map(formatHelper).join(", ")}\n`
       : "";
     const engineText = search.engine ? `Engine: ${search.engine}\n` : "";
     const choices = Array.isArray(search.choices)
@@ -595,7 +603,7 @@ function summarizeTinySearch(search) {
     );
   }
   const helperText = search.spec.helpers.length
-    ? `Helpers: ${search.spec.helpers.map((helper) => helper.name).join(", ")}\n`
+    ? `Helpers: ${search.spec.helpers.map(formatHelper).join(", ")}\n`
     : "";
   const sample = search.candidates
     .slice(0, 8)
