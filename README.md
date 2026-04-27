@@ -79,11 +79,10 @@ node public/generic-supgen-smoke.mjs
 
 ## GitHub Pages
 
-The app is static and deploys the `public/` directory through GitHub Actions.
+The app is static and deploys the `public/` directory to the `gh-pages` branch.
 
 Once Pages is enabled for this repository, the app is available at:
 
 ```text
 https://nbardy.github.io/BabySupGen/
 ```
-
