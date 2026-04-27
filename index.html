@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BabySupGen</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231f7a5a'/%3E%3Cpath d='M8 10h16v3H8zm0 5h10v3H8zm0 5h16v3H8z' fill='white'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>BabySupGen</h1>
+          <p>Browser-native synthesis runtime</p>
+        </div>
+        <div class="actions">
+          <button id="run" class="primary" type="button">Run Search</button>
+          <button id="reset" type="button">Reset Spec</button>
+        </div>
+      </header>
+
+      <section class="controls" aria-label="Run controls">
+        <label class="number-field">
+          <span>Collapse rank</span>
+          <input
+            id="collapse"
+            type="number"
+            min="1"
+            max="100000"
+            step="1"
+            value="1"
+            title="1 returns the first surviving program; higher ranks inspect later survivors."
+          />
+        </label>
+        <label class="number-field">
+          <span>Runtime</span>
+          <select id="runtime-mode" aria-label="Runtime mode">
+            <option value="webgpu" selected>WebGPU/FastSearch</option>
+            <option value="browser">Browser Worker</option>
+            <option value="server">Server Fallback</option>
+          </select>
+        </label>
+        <label class="toggle">
+          <input id="stats" type="checkbox" checked />
+          <span>Stats</span>
+        </label>
+        <span id="status" class="status">Idle</span>
+        <span class="control-note">Collapse rank 1 returns the first survivor; higher ranks inspect alternatives.</span>
+      </section>
+
+      <aside class="credit-note">
+        Idea credit:
+        <a href="https://github.com/VictorTaelin" target="_blank" rel="noreferrer">Victor Taelin</a>
+        and his
+        <a href="https://github.com/VictorTaelin#research" target="_blank" rel="noreferrer">SupGen/HVM research</a>.
+        This is an independent browser prototype built from those ideas.
+      </aside>
+
+      <section class="pane tiny-pane" aria-label="BabySupGen">
+        <div class="pane-heading synth-heading">
+          <span>BabySupGen</span>
+          <div class="synth-actions">
+            <select id="tiny-preset" aria-label="BabySupGen preset"></select>
+            <label class="number-field compact-number">
+              <span>Depth</span>
+              <input id="tiny-depth" type="number" min="0" max="4" step="1" value="2" />
+            </label>
+            <select id="search-dialect" aria-label="Generic search dialect"></select>
+            <button id="generate-tiny" type="button">Generate</button>
+            <button id="run-tiny" class="primary" type="button">Run Search</button>
+          </div>
+        </div>
+        <p id="dialect-help" class="dialect-help"></p>
+        <div class="tiny-body">
+          <label class="tiny-spec">
+            <span>Spec</span>
+            <textarea id="tiny-spec" spellcheck="false"></textarea>
+          </label>
+          <section class="tiny-summary" aria-label="Generated search summary">
+            <div class="synth-section-title">Generated</div>
+            <pre id="tiny-summary"></pre>
+          </section>
+          <section class="tiny-found" aria-label="BabySupGen result">
+            <div class="synth-section-title">Found</div>
+            <pre id="tiny-output"></pre>
+          </section>
+        </div>
+      </section>
+
+      <section class="pane engine-pane" aria-label="Runtime and generator browser">
+        <div class="pane-heading synth-heading">
+          <span>Runtime / Generator Browser</span>
+          <div class="synth-actions">
+            <select id="engine-mode" aria-label="Runtime or generator"></select>
+            <button id="preview-engine" type="button">Preview</button>
+            <button id="load-engine-demo" class="primary" type="button">Load Demo</button>
+          </div>
+        </div>
+        <div class="engine-body">
+          <section class="engine-summary" aria-label="Selected engine path">
+            <div class="synth-section-title">Path</div>
+            <pre id="engine-summary"></pre>
+          </section>
+          <section class="engine-demo" aria-label="Selected engine demo">
+            <div class="synth-section-title">Demo</div>
+            <pre id="engine-demo"></pre>
+          </section>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <label class="pane editor-pane">
+          <span>Program</span>
+          <textarea id="source" spellcheck="false"></textarea>
+        </label>
+        <section class="pane output-pane" aria-label="Output">
+          <div class="pane-heading">
+            <span>Output</span>
+            <div class="pane-actions">
+              <button id="run-program" type="button">Run Program</button>
+              <button id="clear" type="button">Clear</button>
+            </div>
+          </div>
+          <pre id="output"></pre>
+        </section>
+      </section>
+
+      <section class="pane docs-pane" aria-label="Documentation">
+        <div class="pane-heading docs-heading">
+          <span>Specs</span>
+          <div class="docs-tabs" role="tablist" aria-label="Spec documents">
+            <button id="syntax-tab" type="button" data-doc="./spec/syntax.md">Syntax</button>
+            <button id="supgen-tab" type="button" data-doc="./spec/supgen.md">BabySupGen</button>
+            <button id="synthesis-tab" type="button" data-doc="./spec/synthesis.md">Synthesis UI</button>
+            <button id="generic-tab" type="button" data-doc="./spec/generic-supgen.md">Generic</button>
+            <button id="parts-tab" type="button" data-doc="./spec/implementation-parts.md">Build Parts</button>
+            <button id="architecture-tab" type="button" data-doc="./spec/final-architecture.md">
+              Architecture
+            </button>
+            <button id="theory-tab" type="button" data-doc="./spec/full-theory.md">Full Theory</button>
+            <button id="runtime-plan-tab" type="button" data-doc="./spec/current-runtime-plan.md">
+              Runtime Plan
+            </button>
+            <button id="wgpu-plan-tab" type="button" data-doc="./spec/wgpu-runtime-plan.md">WGPU Plan</button>
+            <button id="object-gen-tab" type="button" data-doc="./spec/object-language-generator-plan.md">
+              Object Gen
+            </button>
+          </div>
+        </div>
+        <article id="docs" class="docs"></article>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
