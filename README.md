@@ -25,7 +25,7 @@ The current browser path supports:
 
 - Nat and small scalar expression synthesis
 - typed `Int[] -> Int[]`, `Int[] -> Int`, and `Int[][] -> Int[]` search presets
-- helper holes such as `def aux = ?` and `def pred = ?`
+- helper holes such as `def aux = ?` and typed helper hints such as `def pred(x: Int) -> Bool: ?`
 - a BabySupVM fallback runtime with labelled superpositions and collapse
 - a WebGPU/FastSearch route for supported compiled searches
 
@@ -34,7 +34,7 @@ The current browser path supports:
 `WebGPU/FastSearch` is the default.
 
 - Scalar direct candidate searches run through a real browser WebGPU compute kernel when available.
-- Recursive structural searches currently run through the compiled CPU evaluator.
+- Recursive structural searches and selector-pair searches currently run through the compiled CPU evaluator.
 - Raw BabySupVM programs can still run in the browser worker via `Run Program`.
 
 This is not full HVM4 and not Victor's full SupGen implementation.
@@ -51,6 +51,23 @@ This is not full HVM4 and not Victor's full SupGen implementation.
 - guarded structural recursion
 
 `Minimal + generic library` uses the same core plus early generic shapes for common filter, insert, append, and aggregate scans. This keeps practical examples fast without changing the underlying primitive boundary.
+
+## Helper Hints
+
+Untyped helper holes ask BabySupGen to choose a helper type:
+
+```text
+def aux = ?
+```
+
+Typed helper holes constrain the helper signature but still synthesize the body:
+
+```text
+def pickPrime(xs: Int[]) -> Int: ?
+def isPrimeLike(x: Int) -> Bool: ?
+```
+
+The asserted function is the target. Other typed defs are treated as helper hints.
 
 ## Local Development
 

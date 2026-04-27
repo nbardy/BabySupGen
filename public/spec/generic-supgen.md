@@ -244,6 +244,30 @@ A helper hole such as `def aux = ?` means:
 
 This is the SupGen-style part: a helper is not filled by committing early to one type. The emitted search contains all helper-type variants as correlated choices, and failed branches erase under the oracle.
 
+Typed helper defs are narrower hints:
+
+```text
+def pickPrime(xs: Int[]) -> Int: ?
+def isPrimeLike(x: Int) -> Bool: ?
+def target(xs: Int[]) -> Int[]: ?
+```
+
+The asserted function is the target. Other typed defs are helper holes with fixed signatures. Their bodies are still synthesized from the grammar; the type annotation only reduces the search space and improves the decoded names.
+
+The active list selector-pair path uses those hints when the target returns an `Int[]` of length 2 in every assertion. It can synthesize:
+
+```text
+def isPrimeLike(p: Int) -> Bool:
+  def isPrimeLikeAux(d: Int, n: Int) -> Bool:
+    return if d * d <= n then (if n % d == 0 then false else isPrimeLikeAux(d + 1, n)) else true
+  return if 2 <= p then isPrimeLikeAux(2, p) else false
+
+def isEvenLike(p: Int) -> Bool:
+  return p % 2 == 0
+```
+
+Then it builds two structurally recursive selectors over the input list, such as largest selected value and smallest selected value. This is still finite search: selector predicates, reducer mode, and output order are choices checked against the examples.
+
 ## Oracle
 
 The oracle is a chain of object-language checks:

@@ -583,6 +583,23 @@ function getHelperName(search, fallback = "aux") {
   return search.spec.helpers?.[0]?.name || fallback;
 }
 
+function selectWithPredicate(xs, pred, mode) {
+  let out = -1;
+  for (const x of xs) {
+    if (!truthy(pred(x))) {
+      continue;
+    }
+    if (out === -1) {
+      out = x;
+    } else if (mode === "max") {
+      out = x <= out ? out : x;
+    } else {
+      out = x <= out ? x : out;
+    }
+  }
+  return out;
+}
+
 function directSearch(search, assertions, context) {
   const bodyChoice = search.variantPlans?.[0]?.choices?.[0] || search.choices[0];
   const argNames = search.spec.target.args.map((arg) => arg.name);
@@ -793,6 +810,95 @@ function runIntListToListPredicateVariant(search, variant, assertions, context) 
           if (validateAssertions(assertions, target) && shouldReturnSurvivor(context)) {
             return [variant.index, predIdx, ...auxVector, nil, cons];
           }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function enumerateSelectorCandidates(predChoice, auxChoices, reducerChoice, assertions, expectedIndex, context, limit = Infinity) {
+  const out = [];
+  for (let predIdx = 0; predIdx < predChoice.items.length; predIdx += 1) {
+    const predItem = predChoice.items[predIdx];
+    const auxVectors = predItem.usesNumericHelper
+      ? cartesianRanges(auxChoices.map((choice) => choice.items.length))
+      : [[0, 0, 0, 0, 0, 0]];
+    for (const auxVector of auxVectors) {
+      assertTime(context.started, context.timeoutMs);
+      const predAux = makePredAux(auxChoices, auxVector);
+      const pred = (p) =>
+        truthy(evalExpr(predItem.source, { p }, {
+          predAux,
+          __generic_pred_aux: predAux,
+        }));
+      for (let reducer = 0; reducer < reducerChoice.items.length; reducer += 1) {
+        context.checks += 1;
+        const mode = reducerChoice.items[reducer].mode || (String(reducerChoice.items[reducer].source).includes("largest") ? "max" : "min");
+        let ok = true;
+        for (const assertion of assertions) {
+          if (!Array.isArray(assertion.args[0]) || !Array.isArray(assertion.expected)) {
+            ok = false;
+            break;
+          }
+          const selected = selectWithPredicate(assertion.args[0], pred, mode);
+          if (!deepEqual(selected, assertion.expected[expectedIndex])) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) {
+          out.push({ predIdx, auxVector, reducer, pred, mode });
+          if (out.length >= limit) {
+            return out;
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function runSelectorPairVariant(_search, variant, assertions, context) {
+  const predAChoice = variant.choices[0];
+  const predAAuxChoices = variant.choices.slice(1, 7);
+  const predBChoice = variant.choices[7];
+  const predBAuxChoices = variant.choices.slice(8, 14);
+  const reducerAChoice = variant.choices[14];
+  const reducerBChoice = variant.choices[15];
+  const orderChoice = variant.choices[16];
+
+  for (let order = 0; order < orderChoice.items.length; order += 1) {
+    const leftIndex = orderChoice.items[order].order === "ba" ? 1 : 0;
+    const rightIndex = orderChoice.items[order].order === "ba" ? 0 : 1;
+    const leftSelectors = enumerateSelectorCandidates(predAChoice, predAAuxChoices, reducerAChoice, assertions, leftIndex, context, 1);
+    if (!leftSelectors.length) {
+      continue;
+    }
+    const rightSelectors = enumerateSelectorCandidates(predBChoice, predBAuxChoices, reducerBChoice, assertions, rightIndex, context, 1);
+    if (!rightSelectors.length) {
+      continue;
+    }
+    for (const left of leftSelectors) {
+      for (const right of rightSelectors) {
+        assertTime(context.started, context.timeoutMs);
+        context.checks += 1;
+        const target = (xs) => {
+          const a = selectWithPredicate(xs, left.pred, left.mode);
+          const b = selectWithPredicate(xs, right.pred, right.mode);
+          return orderChoice.items[order].order === "ba" ? [b, a] : [a, b];
+        };
+        if (validateAssertions(assertions, target) && shouldReturnSurvivor(context)) {
+          return [
+            variant.index,
+            left.predIdx,
+            ...left.auxVector,
+            right.predIdx,
+            ...right.auxVector,
+            left.reducer,
+            right.reducer,
+            order,
+          ];
         }
       }
     }
@@ -1054,6 +1160,9 @@ function cartesianRanges(lengths) {
 function runVariant(search, variant, assertions, context) {
   if (variant.direct) {
     return directSearch(search, assertions, context);
+  }
+  if (variant.source.includes("selector pair")) {
+    return runSelectorPairVariant(search, variant, assertions, context);
   }
   if (variant.source.includes("nested-list")) {
     return runNestedListToListVariant(search, variant, assertions, context);
@@ -1394,7 +1503,7 @@ async function runWebGpuDirectCandidateSearch(search, assertions, context) {
   return { supported: true, candidateId: null, note: "WebGPU direct-candidate kernel" };
 }
 
-async function webGpuStatus(preferWebGpu) {
+async function webGpuStatus(preferWebGpu, search) {
   if (!preferWebGpu) {
     return "";
   }
@@ -1408,6 +1517,10 @@ async function webGpuStatus(preferWebGpu) {
     }
     const device = await adapter.requestDevice();
     device.destroy?.();
+    const firstVariant = search?.variantPlans?.[0]?.source || "";
+    if (firstVariant.includes("selector pair")) {
+      return "WebGPU device available; selector-pair search still executed by compiled CPU plan";
+    }
     return "WebGPU device available; recursive search still executed by compiled CPU plan";
   } catch (err) {
     return `WebGPU unavailable (${String(err.message || err)}); used compiled CPU search`;
@@ -1456,7 +1569,7 @@ export async function runCompiledSearch(search, options = {}) {
         : failureResult("Compiled candidate search exhausted the generated space without a survivor.", started, context.checks, runtime, collapseRequested);
     }
 
-    const acceleratorNote = await webGpuStatus(Boolean(options.preferWebGpu));
+    const acceleratorNote = await webGpuStatus(Boolean(options.preferWebGpu), search);
 
     if (search.variantPlans.length === 1 && search.variantPlans[0].direct) {
       const vector = directSearch(search, assertions, context);

@@ -49,6 +49,24 @@ assert primes([-1,0,1,2,4,13]) == [2,13]
 assert primes([8,9,10,12]) == []
 `,
   },
+  largestPrimeSmallestEven: {
+    title: "Largest prime + smallest even",
+    depth: 4,
+    spec: `def pickPrime(xs: Int[]) -> Int: ?
+def pickEven(xs: Int[]) -> Int: ?
+def isPrimeLike(x: Int) -> Bool: ?
+def isEvenLike(x: Int) -> Bool: ?
+def LargestPrimeBySmallestEvenNumber(xs: Int[]) -> Int[]: ?
+
+assert LargestPrimeBySmallestEvenNumber([1,2,3,4,5,6,7,8,9,10,11]) == [11,2]
+assert LargestPrimeBySmallestEvenNumber([1,2,4,13]) == [13,2]
+assert LargestPrimeBySmallestEvenNumber([8,9,10,12,137]) == [137,8]
+assert LargestPrimeBySmallestEvenNumber([17,25,4,8]) == [17,4]
+assert LargestPrimeBySmallestEvenNumber([23,35,8,14]) == [23,8]
+assert LargestPrimeBySmallestEvenNumber([29,49,10,12]) == [29,10]
+assert LargestPrimeBySmallestEvenNumber([31,121,14,18]) == [31,14]
+`,
+  },
   nestedFlatten: {
     title: "Nested list flatten",
     depth: 4,

@@ -58,6 +58,15 @@ assert.equal(primes.ok, true);
 assert.match(primesSearch.decodeChoiceVector(vectorFrom(primes)), /n % d == 0/);
 assert.match(primesSearch.decodeChoiceVector(vectorFrom(primes)), /predAux\(2, p\)/);
 
+const selectorPairSearch = searchFor("largestPrimeSmallestEven");
+const selectorPair = await runCompiledSearch(selectorPairSearch, { timeoutMs: 60_000 });
+assert.equal(selectorPair.ok, true);
+assert.match(selectorPairSearch.decodeChoiceVector(vectorFrom(selectorPair)), /def isPrimeLikeAux\(d: Int, n: Int\) -> Bool:/);
+assert.match(selectorPairSearch.decodeChoiceVector(vectorFrom(selectorPair)), /n % d == 0/);
+assert.match(selectorPairSearch.decodeChoiceVector(vectorFrom(selectorPair)), /def isEvenLike\(p: Int\) -> Bool:/);
+assert.match(selectorPairSearch.decodeChoiceVector(vectorFrom(selectorPair)), /p % 2 == 0/);
+assert.match(selectorPairSearch.decodeChoiceVector(vectorFrom(selectorPair)), /return \[pickPrime\(xs\), pickEven\(xs\)\]/);
+
 const minEvenSearch = searchFor("minEven");
 const minEven = await runCompiledSearch(minEvenSearch);
 assert.equal(minEven.ok, true);

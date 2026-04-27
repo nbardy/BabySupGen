@@ -95,6 +95,7 @@ assert subPrimes([8,9,10,12]) == []
   genericMaxSquareMinusMin: genericSupGenPresets.maxSquareMinusMin,
   genericSort: genericSupGenPresets.sort,
   genericFilterPrimes: genericSupGenPresets.filterPrimes,
+  genericLargestPrimeSmallestEven: genericSupGenPresets.largestPrimeSmallestEven,
   genericNestedFlatten: genericSupGenPresets.nestedFlatten,
 };
 
@@ -212,10 +213,20 @@ export function parseTinySpec(text) {
     throw new Error(`Could not parse line: ${line}`);
   }
 
-  if (defs.length !== 1) {
-    throw new Error("TinySupGen currently expects exactly one typed target def.");
+  if (defs.length === 0) {
+    throw new Error("Add one typed target def.");
   }
-  const target = defs[0];
+  const assertedNames = new Set(assertions.map((assertion) => assertion.fn));
+  const assertedDefs = defs.filter((def) => assertedNames.has(def.name));
+  if (assertedDefs.length !== 1) {
+    throw new Error("TinySupGen expects exactly one typed target def referenced by asserts.");
+  }
+  const target = assertedDefs[0];
+  for (const def of defs) {
+    if (def !== target) {
+      helpers.push({ name: def.name, args: def.args, ret: def.ret, typed: true });
+    }
+  }
   if (assertions.length === 0) {
     throw new Error("Add at least one assert.");
   }

@@ -154,6 +154,56 @@ function helperName(spec, fallback = "aux") {
   return spec.helpers[0]?.name || fallback;
 }
 
+function splitTopLevelText(text, separator = ",") {
+  const out = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "(" || char === "[" || char === "{") {
+      depth += 1;
+    } else if (char === ")" || char === "]" || char === "}") {
+      depth -= 1;
+    } else if (char === separator && depth === 0) {
+      out.push(text.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  const tail = text.slice(start).trim();
+  if (tail) {
+    out.push(tail);
+  }
+  return out;
+}
+
+function helperNamesBySignature(spec, argTypes, retType) {
+  return (spec.helpers || [])
+    .filter((helper) => helper.typed)
+    .filter((helper) => {
+      if (!helper.args || helper.args.length !== argTypes.length || helper.ret !== retType) {
+        return false;
+      }
+      return helper.args.every((arg, index) => arg.type === argTypes[index]);
+    })
+    .map((helper) => helper.name);
+}
+
+function helperNamesUntyped(spec) {
+  return (spec.helpers || []).filter((helper) => !helper.typed).map((helper) => helper.name);
+}
+
+function selectorPairNames(spec) {
+  const selectors = helperNamesBySignature(spec, ["Int[]"], "Int");
+  const typedPreds = helperNamesBySignature(spec, ["Int"], "Bool");
+  const untyped = helperNamesUntyped(spec);
+  return {
+    selectorA: selectors[0] || "select1",
+    selectorB: selectors[1] || "select2",
+    predA: typedPreds[0] || untyped[0] || "pred1",
+    predB: typedPreds[1] || untyped[1] || "pred2",
+  };
+}
+
 function intBindings(ctx) {
   return ctx.filter((entry) => isInt(entry.type)).map((entry) => item(entry.name, entry.source || entry.name));
 }
@@ -769,6 +819,62 @@ function fullSearch(spec, depth, dialect, lines, choices, assertions, decode, va
   };
 }
 
+function predicateTermFor(choice, auxName) {
+  return choice.term.replaceAll("@__generic_pred_aux", `@${auxName}`);
+}
+
+function selectorReducerChoice(label) {
+  return makeChoice(
+    label,
+    [
+      item(
+        ifTerm("r === -1", "x", ifTerm("x <= r", "x", "r")),
+        "minimum selected value",
+        { mode: "min" },
+      ),
+      item(
+        ifTerm("r === -1", "x", ifTerm("x <= r", "r", "x")),
+        "largest selected value",
+        { mode: "max" },
+      ),
+    ],
+    "selector reducer",
+  );
+}
+
+function selectorFunctionTerm(selectorName, predName, reducerChoice) {
+  return `@${selectorName} = λxs. λ{[]:-1; <>:λx,rest.!r = @${selectorName}(rest); λ{0:r; 1:${reducerChoice.term}}(@${predName}(x))}(xs)`;
+}
+
+function expectedIntListLength(source) {
+  const text = String(source).trim();
+  if (!text.startsWith("[") || !text.endsWith("]")) {
+    return null;
+  }
+  const inner = text.slice(1, -1).trim();
+  return inner ? splitTopLevelText(inner).length : 0;
+}
+
+function looksLikeSelectorPairSpec(spec) {
+  return spec.assertions.length > 0 && spec.assertions.every((assertion) => expectedIntListLength(assertion.expected) === 2);
+}
+
+function formatSelectorDefinition(name, listName, predName, reducerItem) {
+  const compare =
+    reducerItem?.mode === "max"
+      ? "if x <= r then r else x"
+      : "if x <= r then x else r";
+  return [
+    `def ${name}(${listName}: Int[]) -> Int:`,
+    `  match ${listName}:`,
+    "    case []:",
+    "      return -1",
+    "    case x <> rest:",
+    `      let r = ${name}(rest)`,
+    `      return if ${predName}(x) then (if r == -1 then x else ${compare}) else r`,
+  ].join("\n");
+}
+
 function flattenChoices(variants) {
   return [
     { name: "top-level generated plan", items: variants.map((variant) => item(variant.source, variant.source)) },
@@ -1032,6 +1138,21 @@ function buildIntListToIntList(spec, depth, listArg, dialect) {
   const helper = helperName(spec, "aux");
   const predChoice = predicateBodyChoice("generic_ltl_pred_body", "p");
   const predAuxChoice = numericBoolRecChoice("generic_ltl_pred_aux_body");
+  const pairNames = selectorPairNames(spec);
+  const pairPredAChoice = predicateBodyChoice("generic_pair_pred_a_body", "p");
+  const pairPredAAuxChoice = numericBoolRecChoice("generic_pair_pred_a_aux_body");
+  const pairPredBChoice = predicateBodyChoice("generic_pair_pred_b_body", "p");
+  const pairPredBAuxChoice = numericBoolRecChoice("generic_pair_pred_b_aux_body");
+  const pairReducerAChoice = selectorReducerChoice("generic_pair_selector_a_reduce");
+  const pairReducerBChoice = selectorReducerChoice("generic_pair_selector_b_reduce");
+  const pairOrderChoice = makeChoice(
+    "generic_pair_order",
+    [
+      item(`[@${pairNames.selectorA}(${listArg.name}), @${pairNames.selectorB}(${listArg.name})]`, `[${pairNames.selectorA}(${listArg.name}), ${pairNames.selectorB}(${listArg.name})]`, { order: "ab" }),
+      item(`[@${pairNames.selectorB}(${listArg.name}), @${pairNames.selectorA}(${listArg.name})]`, `[${pairNames.selectorB}(${listArg.name}), ${pairNames.selectorA}(${listArg.name})]`, { order: "ba" }),
+    ],
+    "selector output order",
+  );
   const genericPredSelf = "@__generic_list_struct_pred(rest)";
   const genericPredCall = "@__generic_pred(x)";
   const genericPredTarget = genericIntListRecChoices(
@@ -1108,11 +1229,51 @@ function buildIntListToIntList(spec, depth, listArg, dialect) {
       ].join("\n");
     },
   };
+  const selectorPairVariant = {
+    source: "selector pair list output",
+    pairNames,
+    term: `λ${listArg.name}.${pairOrderChoice.term}`,
+    id: `[2,${pairPredAChoice.id},${pairPredAAuxChoice.id},${pairPredBChoice.id},${pairPredBAuxChoice.id},${pairReducerAChoice.id},${pairReducerBChoice.id},${pairOrderChoice.id}]`,
+    choices: [
+      pairPredAChoice,
+      ...pairPredAAuxChoice.choices,
+      pairPredBChoice,
+      ...pairPredBAuxChoice.choices,
+      pairReducerAChoice,
+      pairReducerBChoice,
+      pairOrderChoice,
+    ],
+    decode(vector) {
+      const predA = vector[1];
+      const predAAuxVector = vector.slice(2, 2 + pairPredAAuxChoice.width);
+      const predBOffset = 2 + pairPredAAuxChoice.width;
+      const predB = vector[predBOffset];
+      const predBAuxVector = vector.slice(predBOffset + 1, predBOffset + 1 + pairPredBAuxChoice.width);
+      const reducerA = vector[predBOffset + 1 + pairPredBAuxChoice.width];
+      const reducerB = vector[predBOffset + 2 + pairPredBAuxChoice.width];
+      const order = vector[predBOffset + 3 + pairPredBAuxChoice.width];
+      return [
+        formatPredicateDefinition(pairNames.predA, "p", pairPredAChoice.items[predA], pairPredAAuxChoice.sourceFromVector(predAAuxVector)),
+        "",
+        formatPredicateDefinition(pairNames.predB, "p", pairPredBChoice.items[predB], pairPredBAuxChoice.sourceFromVector(predBAuxVector)),
+        "",
+        formatSelectorDefinition(pairNames.selectorA, listArg.name, pairNames.predA, pairReducerAChoice.items[reducerA]),
+        "",
+        formatSelectorDefinition(pairNames.selectorB, listArg.name, pairNames.predB, pairReducerBChoice.items[reducerB]),
+        "",
+        `def ${target}(${listArg.name}: Int[]) -> Int[]:`,
+        `  return ${pairOrderChoice.items[order]?.source || "?"}`,
+      ].join("\n");
+    },
+  };
   const variants = spec.ensures.some((ensure) => ensure.includes("sorted") || ensure.includes("permutation"))
     ? [genericHelperVariant]
-    : [genericPredicateVariant, genericHelperVariant];
+    : looksLikeSelectorPairSpec(spec)
+      ? [selectorPairVariant, genericPredicateVariant, genericHelperVariant]
+      : [genericPredicateVariant, genericHelperVariant];
   const includesPredicateVariant = variants.includes(genericPredicateVariant);
   const includesHelperVariant = variants.includes(genericHelperVariant);
+  const includesSelectorPairVariant = variants.includes(selectorPairVariant);
   const top = variantChoice(variants);
   const allAssertions = spec.ensures.some((ensure) => ensure.includes("sorted") || ensure.includes("permutation"))
     ? withGeneratedSortAssertions(spec)
@@ -1140,6 +1301,16 @@ function buildIntListToIntList(spec, depth, listArg, dialect) {
           `@__generic_list_struct_helper = λxs. λ{[]:${genericHelperTarget.nil.term}; <>:λx,rest.${genericHelperTarget.cons.term}}(xs)`,
         ]
       : []),
+    ...(includesSelectorPairVariant
+      ? [
+          `@${pairNames.predA}Aux = λd,n.${predicateTermFor(pairPredAAuxChoice, `${pairNames.predA}Aux`)}`,
+          `@${pairNames.predA} = λp.${predicateTermFor(pairPredAChoice, `${pairNames.predA}Aux`)}`,
+          `@${pairNames.predB}Aux = λd,n.${predicateTermFor(pairPredBAuxChoice, `${pairNames.predB}Aux`)}`,
+          `@${pairNames.predB} = λp.${predicateTermFor(pairPredBChoice, `${pairNames.predB}Aux`)}`,
+          selectorFunctionTerm(pairNames.selectorA, pairNames.predA, pairReducerAChoice),
+          selectorFunctionTerm(pairNames.selectorB, pairNames.predB, pairReducerBChoice),
+        ]
+      : []),
     `@${target} = ${top.value.term}`,
     `@op_id = ${top.id}`,
     `@main = ${buildChecks("@op_id", [...baseChecks, ...ensured.checks])}`,
@@ -1156,6 +1327,7 @@ function buildIntListToIntList(spec, depth, listArg, dialect) {
       index,
       source: variant.source,
       choices: variant.choices,
+      pairNames: variant.pairNames,
     })),
   );
 }
