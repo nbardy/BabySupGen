@@ -32,10 +32,7 @@ const source = document.querySelector("#source");
 const output = document.querySelector("#output");
 const collapse = document.querySelector("#collapse");
 const runtimeMode = document.querySelector("#runtime-mode");
-const status = document.querySelector("#status");
-const run = document.querySelector("#run");
 const runProgramButton = document.querySelector("#run-program");
-const reset = document.querySelector("#reset");
 const clear = document.querySelector("#clear");
 const stats = document.querySelector("#stats");
 const docs = document.querySelector("#docs");
@@ -43,11 +40,9 @@ const docTabs = document.querySelectorAll("[data-doc]");
 const tinyPreset = document.querySelector("#tiny-preset");
 const tinyDepth = document.querySelector("#tiny-depth");
 const searchDialect = document.querySelector("#search-dialect");
-const dialectHelp = document.querySelector("#dialect-help");
 const tinySpec = document.querySelector("#tiny-spec");
 const tinySummary = document.querySelector("#tiny-summary");
 const tinyOutput = document.querySelector("#tiny-output");
-const generateTiny = document.querySelector("#generate-tiny");
 const runTiny = document.querySelector("#run-tiny");
 const engineMode = document.querySelector("#engine-mode");
 const engineSummary = document.querySelector("#engine-summary");
@@ -57,22 +52,22 @@ const loadEngineDemo = document.querySelector("#load-engine-demo");
 const BROWSER_RUN_TIMEOUT_MS = 60_000;
 let browserRunId = 0;
 
-function setStatus(text, tone = "") {
-  status.textContent = text;
-  status.className = `status ${tone}`.trim();
+function setDisabled(element, disabled) {
+  if (element) {
+    element.disabled = disabled;
+  }
 }
 
 function setExample(name) {
   source.value = examples[name] || examples.list;
   output.textContent = "";
-  setStatus("Idle");
 }
 
 function formatResult(result) {
   const parts = [];
   if (result.stdout) {
     const lines = result.stdout.trimEnd().split("\n");
-    if (!stats.checked) {
+    if (stats && !stats.checked) {
       parts.push(lines.filter((line) => !line.startsWith("- Itrs:")).join("\n"));
     } else {
       parts.push(result.stdout.trimEnd());
@@ -95,15 +90,6 @@ function formatResult(result) {
 
 function selectedSearchDialect() {
   return searchDialect?.value || "library";
-}
-
-function updateDialectHelp() {
-  const dialect = genericSearchDialects[selectedSearchDialect()] || genericSearchDialects.library;
-  const core =
-    "Minimal core: variables, constants, arithmetic, bools, conditionals, list constructors, list match, helper calls, and guarded structural recursion.";
-  const library =
-    "Minimal + generic library: the same core plus early generic shapes for filter, insert, append, and aggregate scans so common structure is not rediscovered every run.";
-  dialectHelp.textContent = dialect.id === "minimal" ? core : library;
 }
 
 function buildSortSearch(dialect = selectedSearchDialect()) {
@@ -262,7 +248,6 @@ const engineModes = {
         "",
       ].join("\n");
       output.textContent = "";
-      setStatus("Loaded", "ok");
     },
   },
 };
@@ -302,7 +287,7 @@ function postRunBrowser(sourceText) {
         valueText: null,
         interactions: null,
         elapsedMs: Math.round(performance.now() - started),
-        collapseRequested: Number(collapse.value) || 1,
+        collapseRequested: Number(collapse?.value) || 1,
         error: "browser worker timed out",
         runtime: "browser-worker",
       });
@@ -328,12 +313,12 @@ function postRunBrowser(sourceText) {
         valueText: null,
         interactions: null,
         elapsedMs: Math.round(performance.now() - started),
-        collapseRequested: Number(collapse.value) || 1,
+        collapseRequested: Number(collapse?.value) || 1,
         error: event.message || "browser worker failed",
         runtime: "browser-worker",
       });
     };
-    worker.postMessage({ id, source: sourceText, collapse: collapse.value });
+    worker.postMessage({ id, source: sourceText, collapse: collapse?.value || 1 });
   });
 }
 
@@ -349,7 +334,7 @@ function postRunWebGpuRawUnsupported() {
     valueText: null,
     interactions: null,
     elapsedMs: 0,
-    collapseRequested: Number(collapse.value) || 1,
+    collapseRequested: Number(collapse?.value) || 1,
     error: "WebGPU/FastSearch does not run raw BabySupVM source",
     runtime: "fastsearch-raw-unsupported",
   };
@@ -361,7 +346,7 @@ async function postRunServer(sourceText) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       source: sourceText,
-      collapse: collapse.value,
+      collapse: collapse?.value || 1,
     }),
   });
   const result = await response.json();
@@ -374,10 +359,10 @@ async function postRunServer(sourceText) {
 }
 
 async function postRun(sourceText) {
-  if (runtimeMode.value === "webgpu") {
+  if (runtimeMode?.value === "webgpu") {
     return postRunWebGpuRawUnsupported();
   }
-  if (runtimeMode.value === "server") {
+  if (runtimeMode?.value === "server") {
     return await postRunServer(sourceText);
   }
   const browserResult = postRunBrowser(sourceText);
@@ -388,10 +373,10 @@ async function postRun(sourceText) {
 }
 
 async function runGeneratedSearch(search) {
-  if (runtimeMode.value === "webgpu") {
+  if (runtimeMode?.value === "webgpu") {
     if (search.variantPlans?.length) {
       return await runCompiledSearch(search, {
-        collapse: collapse.value,
+        collapse: collapse?.value || 1,
         preferWebGpu: true,
         timeoutMs: BROWSER_RUN_TIMEOUT_MS,
       });
@@ -519,23 +504,16 @@ async function loadDoc(path) {
 }
 
 async function runProgram() {
-  run.disabled = true;
-  runProgramButton.disabled = true;
-  reset.disabled = true;
-  setStatus("Running", "running");
+  setDisabled(runProgramButton, true);
   output.textContent = "";
 
   try {
     const result = await postRun(source.value);
     output.textContent = formatResult(result) || "(no output)";
-    setStatus(result.ok ? "Done" : "Error", result.ok ? "ok" : "error");
   } catch (err) {
     output.textContent = String(err.message || err);
-    setStatus("Error", "error");
   } finally {
-    run.disabled = false;
-    runProgramButton.disabled = false;
-    reset.disabled = false;
+    setDisabled(runProgramButton, false);
   }
 }
 
@@ -550,7 +528,6 @@ function setTinyPreset(name) {
   const preset = selectedTinyPreset();
   tinyDepth.value = String(preset.depth);
   searchDialect.value = preset.dialect || "library";
-  updateDialectHelp();
   tinySpec.value = preset.spec;
   currentTinySearch = null;
   tinySummary.textContent = "Generate a typed search program.";
@@ -631,7 +608,6 @@ function generateTinyIntoEditor() {
   output.textContent = "";
   tinySummary.textContent = summarizeTinySearch(search);
   tinyOutput.textContent = "Generated BabySupVM search program in the editor.";
-  setStatus("Generated", "ok");
   return search;
 }
 
@@ -669,12 +645,8 @@ function formatTinyResult(search, result) {
 }
 
 async function runTinySearch() {
-  generateTiny.disabled = true;
-  runTiny.disabled = true;
-  run.disabled = true;
-  runProgramButton.disabled = true;
-  reset.disabled = true;
-  setStatus("Searching", "running");
+  setDisabled(runTiny, true);
+  setDisabled(runProgramButton, true);
   output.textContent = "";
   tinyOutput.textContent = "";
 
@@ -683,18 +655,13 @@ async function runTinySearch() {
     const result = await runGeneratedSearch(search);
     output.textContent = formatResult(result) || "(no output)";
     tinyOutput.textContent = formatTinyResult(search, result);
-    setStatus(result.ok ? "Done" : "Error", result.ok ? "ok" : "error");
   } catch (err) {
     const msg = String(err.message || err);
     output.textContent = msg;
     tinyOutput.textContent = msg;
-    setStatus("Error", "error");
   } finally {
-    generateTiny.disabled = false;
-    runTiny.disabled = false;
-    run.disabled = false;
-    runProgramButton.disabled = false;
-    reset.disabled = false;
+    setDisabled(runTiny, false);
+    setDisabled(runProgramButton, false);
   }
 }
 
@@ -723,52 +690,37 @@ Object.entries(engineModes).forEach(([key, mode]) => {
 tinyPreset.addEventListener("change", () => setTinyPreset(tinyPreset.value));
 searchDialect.addEventListener("change", () => {
   try {
-    updateDialectHelp();
     currentTinySearch = null;
     generateTinyIntoEditor();
   } catch (err) {
     const msg = String(err.message || err);
     tinyOutput.textContent = msg;
-    setStatus("Error", "error");
   }
 });
 engineMode.addEventListener("change", previewSelectedEngine);
-generateTiny.addEventListener("click", () => {
-  try {
-    generateTinyIntoEditor();
-  } catch (err) {
-    const msg = String(err.message || err);
-    tinyOutput.textContent = msg;
-    setStatus("Error", "error");
-  }
-});
-runTiny.addEventListener("click", runTinySearch);
-previewEngine.addEventListener("click", previewSelectedEngine);
-loadEngineDemo.addEventListener("click", loadSelectedEngineDemo);
-run.addEventListener("click", runTinySearch);
-runProgramButton.addEventListener("click", runProgram);
-reset.addEventListener("click", () => {
-  setTinyPreset("natInc");
-  generateTinyIntoEditor();
-});
-clear.addEventListener("click", () => {
+runTiny?.addEventListener("click", runTinySearch);
+previewEngine?.addEventListener("click", previewSelectedEngine);
+loadEngineDemo?.addEventListener("click", loadSelectedEngineDemo);
+runProgramButton?.addEventListener("click", runProgram);
+clear?.addEventListener("click", () => {
   output.textContent = "";
-  setStatus("Idle");
 });
-source.addEventListener("keydown", (event) => {
+source?.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
     event.preventDefault();
     runProgram();
   }
 });
-tinySpec.addEventListener("keydown", (event) => {
+tinySpec?.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
     event.preventDefault();
     runTinySearch();
   }
 });
 
-runtimeMode.value = "webgpu";
+if (runtimeMode) {
+  runtimeMode.value = "webgpu";
+}
 setTinyPreset("natInc");
 generateTinyIntoEditor();
 engineMode.value = "genericSupGen";
