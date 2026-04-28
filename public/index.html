@@ -14,26 +14,7 @@
           <h1>BabySupGen</h1>
           <p>Browser-native synthesis runtime</p>
         </div>
-        <div class="actions">
-          <button id="run" class="primary" type="button">Run Search</button>
-          <button id="reset" type="button">Reset Spec</button>
-        </div>
-      </header>
-
-      <section class="controls" aria-label="Run controls">
-        <label class="number-field">
-          <span>Collapse rank</span>
-          <input
-            id="collapse"
-            type="number"
-            min="1"
-            max="100000"
-            step="1"
-            value="1"
-            title="1 returns the first surviving program; higher ranks inspect later survivors."
-          />
-        </label>
-        <label class="number-field">
+        <label class="runtime-field">
           <span>Runtime</span>
           <select id="runtime-mode" aria-label="Runtime mode">
             <option value="webgpu" selected>WebGPU/FastSearch</option>
@@ -41,25 +22,16 @@
             <option value="server">Server Fallback</option>
           </select>
         </label>
-        <label class="toggle">
-          <input id="stats" type="checkbox" checked />
-          <span>Stats</span>
-        </label>
-        <span id="status" class="status">Idle</span>
-        <span class="control-note">Collapse rank 1 returns the first survivor; higher ranks inspect alternatives.</span>
-      </section>
+      </header>
+
+      <input id="collapse" type="hidden" value="1" />
+      <input id="stats" type="checkbox" checked hidden />
 
       <aside class="credit-note" aria-label="Research attribution">
-        <div class="credit-kicker">Research Credit</div>
-        <div class="credit-title">Inspired by Victor Taelin's SupGen, HVM, and interaction-net research.</div>
-        <p>
-          BabySupGen is an independent browser prototype built to explore those ideas in a small, inspectable UI.
-          The original work and research direction come from Victor Taelin.
-        </p>
-        <div class="credit-links">
-          <a href="https://github.com/VictorTaelin" target="_blank" rel="noreferrer">VictorTaelin on GitHub</a>
-          <a href="https://github.com/VictorTaelin#research" target="_blank" rel="noreferrer">Research index</a>
-        </div>
+        All credit for the research goes to
+        <a href="https://github.com/VictorTaelin" target="_blank" rel="noreferrer">Victor Taelin</a>.
+        This was just me seeing if I could vibe code some portion of his work.
+        <a href="https://github.com/VictorTaelin#research" target="_blank" rel="noreferrer">Research index</a>
       </aside>
 
       <section class="pane tiny-pane" aria-label="BabySupGen">
@@ -72,11 +44,9 @@
               <input id="tiny-depth" type="number" min="0" max="4" step="1" value="2" />
             </label>
             <select id="search-dialect" aria-label="Generic search dialect"></select>
-            <button id="generate-tiny" type="button">Generate</button>
             <button id="run-tiny" class="primary" type="button">Run Search</button>
           </div>
         </div>
-        <p id="dialect-help" class="dialect-help"></p>
         <div class="tiny-body">
           <label class="tiny-spec">
             <span>Spec</span>
