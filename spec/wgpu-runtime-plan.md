@@ -467,9 +467,8 @@ Cache levels:
 
 - in-memory per page session
 - optional IndexedDB cache for browser
-- optional filesystem cache for server-side WGPU
 
-## Browser Versus Server Deployment
+## Browser Deployment
 
 Browser WebGPU:
 
@@ -477,12 +476,6 @@ Browser WebGPU:
 - no server process needed after page load
 - requires WebGPU availability
 - needs Web Worker to avoid blocking UI
-
-Server WGPU:
-
-- can run from Node with GPU bindings if available
-- easier to benchmark
-- harder to guarantee on every machine
 
 CPU typed-array:
 
@@ -495,15 +488,7 @@ Recommended routing:
 ```text
 try browser WebGPU
 else try browser CPU typed-array worker
-else server current SupVM
-```
-
-Server config:
-
-```text
-SUPGEN_FAST_RUNTIME=supvm
-SUPGEN_FAST_RUNTIME=cpu
-SUPGEN_FAST_RUNTIME=webgpu
+else browser BabySupVM worker
 ```
 
 Browser config:
@@ -512,7 +497,7 @@ Browser config:
 runtime=auto
 runtime=cpu
 runtime=webgpu
-runtime=supvm-server
+runtime=babysupvm-worker
 ```
 
 ## Parity Tests

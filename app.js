@@ -175,8 +175,6 @@ const engineModes = {
         "  -> babysupvm-runtime.js",
         "browser runtime",
         "  -> parse, evaluate @main, collapse, return JSON",
-        "",
-        "server.mjs remains only as a local fallback/host.",
       ].join("\n"),
     demo: () => examples.search.trim(),
     load: () => setExample("search"),
@@ -330,7 +328,7 @@ function postRunWebGpuRawUnsupported() {
     timedOut: false,
     stdout: "",
     stderr:
-      "WebGPU/FastSearch runs generated BabySupGen searches from Run Search.\nScalar direct candidates can use the browser WebGPU kernel; recursive structural searches use the compiled CPU plan.\nRaw BabySupVM programs still run through Browser Worker or Server Fallback.\n",
+      "WebGPU/FastSearch runs generated BabySupGen searches from Run Search.\nScalar direct candidates can use the browser WebGPU kernel; recursive structural searches use the compiled CPU plan.\nRaw BabySupVM programs run through Browser Worker.\n",
     valueText: null,
     interactions: null,
     elapsedMs: 0,
@@ -340,36 +338,28 @@ function postRunWebGpuRawUnsupported() {
   };
 }
 
-async function postRunServer(sourceText) {
-  const response = await fetch(new URL("./api/run", import.meta.url), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      source: sourceText,
-      collapse: collapse?.value || 1,
-    }),
-  });
-  const result = await response.json();
-  const hasRuntimeShape =
-    "stdout" in result || "stderr" in result || "timedOut" in result || "code" in result || "signal" in result;
-  if (!response.ok && result.error && !hasRuntimeShape) {
-    throw new Error(result.error);
-  }
-  return result;
-}
-
 async function postRun(sourceText) {
   if (runtimeMode?.value === "webgpu") {
     return postRunWebGpuRawUnsupported();
-  }
-  if (runtimeMode?.value === "server") {
-    return await postRunServer(sourceText);
   }
   const browserResult = postRunBrowser(sourceText);
   if (browserResult) {
     return await browserResult;
   }
-  return await postRunServer(sourceText);
+  return {
+    ok: false,
+    code: 1,
+    signal: null,
+    timedOut: false,
+    stdout: "",
+    stderr: "Browser Worker runtime is unavailable in this browser.\n",
+    valueText: null,
+    interactions: null,
+    elapsedMs: 0,
+    collapseRequested: Number(collapse?.value) || 1,
+    error: "Browser Worker runtime is unavailable",
+    runtime: "browser-worker-unavailable",
+  };
 }
 
 async function runGeneratedSearch(search) {
@@ -389,7 +379,7 @@ async function runGeneratedSearch(search) {
         stderr: `${result.stderr || ""}${result.stderr ? "\n" : ""}FastSearch note: this generator has no compiled variant metadata yet, so it used Browser Worker fallback.\n`,
       };
     }
-    return await postRunServer(search.program);
+    return await postRun(search.program);
   }
   return await postRun(search.program);
 }
