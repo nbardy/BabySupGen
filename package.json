@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "npx --yes serve@latest public -l 5177"
   },
   "engines": {
     "node": ">=24"

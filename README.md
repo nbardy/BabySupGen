@@ -26,7 +26,7 @@ The current browser path supports:
 - Nat and small scalar expression synthesis
 - typed `Int[] -> Int[]`, `Int[] -> Int`, and `Int[][] -> Int[]` search presets
 - helper holes such as `def aux = ?` and typed helper hints such as `def pred(x: Int) -> Bool: ?`
-- a BabySupVM fallback runtime with labelled superpositions and collapse
+- a browser BabySupVM runtime with labelled superpositions and collapse
 - a WebGPU/FastSearch route for supported compiled searches
 
 ## Runtime Modes
@@ -35,7 +35,9 @@ The current browser path supports:
 
 - Scalar direct candidate searches run through a real browser WebGPU compute kernel when available.
 - Recursive structural searches and selector-pair searches currently run through the compiled CPU evaluator.
-- Raw BabySupVM programs can still run in the browser worker via `Run Program`.
+- Raw BabySupVM programs run in the browser worker via `Run Program`.
+
+The app is fully static. There is no backend API and no server-side runtime path.
 
 This is not full HVM4 and not Victor's full SupGen implementation.
 
@@ -96,7 +98,7 @@ node public/generic-supgen-smoke.mjs
 
 ## GitHub Pages
 
-The app is static and deploys the `public/` directory to the `gh-pages` branch.
+The app deploys the `public/` directory to the `gh-pages` branch. Markdown docs are loaded from `public/spec/*.md` with static relative `fetch()` calls, so GitHub Pages can host them without a backend.
 
 Once Pages is enabled for this repository, the app is available at:
 

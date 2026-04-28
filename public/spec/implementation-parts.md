@@ -26,13 +26,15 @@ supVM_full.ts
   collapse search
 ```
 
-Server:
+Static host:
 
 ```text
-server.mjs
-  serves the UI
-  POST /api/run
-  runs supVM_full.ts by default
+GitHub Pages / any static file server
+  serves public/index.html
+  serves public/app.js modules
+  serves public/spec/*.md docs
+  no backend API
+  no POST /api/run
 ```
 
 Generator:
@@ -109,7 +111,7 @@ collapse surviving branches
 print normal forms
 ```
 
-Current status: implemented in `supVM_full.ts` for the subset we need.
+Current status: implemented in the browser runtime generated as `public/babysupvm-runtime.js` for the subset we need. The older TypeScript sources remain as development references, but the hosted app does not call a Node server.
 
 2. Type Frontend
 
@@ -224,7 +226,7 @@ Current status: not implemented here. The project uses a small interpreter that 
 For the current UI:
 
 ```text
-Need a new runtime?  Partly done. BabySupVM remains the semantic fallback; compiled-search-runtime.js is the fast generated-search lane.
+Need a new runtime?  Partly done. Browser BabySupVM remains the semantic fallback; compiled-search-runtime.js is the fast generated-search lane.
 Need a new HVM?      No, unless we want real HVM4-scale parallel search.
 Need a new generator? Yes. That remains the main long-term work.
 ```
